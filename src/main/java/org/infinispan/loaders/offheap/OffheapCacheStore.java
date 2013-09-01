@@ -25,6 +25,15 @@ import org.infinispan.util.logging.LogFactory;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 
+/**
+ * A cache store that can store entries off-heap in direct memory.
+ * This implementation uses MapDB's Direct Memory DB.
+ * 
+ * At most one offheap store can be used by one cache.
+ * 
+ * @author <a href="mailto:rtsang@redhat.com">Ray Tsang</a>
+ * @since 6.0
+ */
 public class OffheapCacheStore extends LockSupportCacheStore<Integer> {
    private static final Log log = LogFactory.getLog(OffheapCacheStore.class, Log.class);
    

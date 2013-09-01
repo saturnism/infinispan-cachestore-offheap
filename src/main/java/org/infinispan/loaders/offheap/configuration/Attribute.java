@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Enumerates the attributes used by the LevelDB cache stores configuration
+ * Enumerates the attributes used by the Offheap cache stores configuration
  * 
  * @author <a href="mailto:rtsang@redhat.com">Ray Tsang</a>
  */

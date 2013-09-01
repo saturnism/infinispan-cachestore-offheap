@@ -12,7 +12,7 @@ import org.infinispan.loaders.spi.CacheStore;
 import org.infinispan.test.fwk.TestInternalCacheEntryFactory;
 import org.testng.annotations.Test;
 
-@Test(groups = "unit", testName = "loaders.offheap.LevelDBCacheStoreTest")
+@Test(groups = "unit", testName = "loaders.offheap.OffheapCacheStoreTest")
 public class OffheapCacheStoreTest extends BaseCacheStoreTest {
 
    private OffheapCacheStore fcs;

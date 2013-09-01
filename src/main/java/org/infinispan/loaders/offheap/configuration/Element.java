@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * An enumeration of all the recognized XML element local names for the LevelDB cache stores
+ * An enumeration of all the recognized XML element local names for the Offheap cache stores
  * 
  * @author <a href="mailto:rtsang@redhat.com">Ray Tsang</a>
  */
