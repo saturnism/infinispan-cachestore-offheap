@@ -1,26 +1,26 @@
 package org.infinispan.loaders.offheap;
 
 import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.infinispan.Cache;
-import org.infinispan.commons.marshall.StreamingMarshaller;
-import org.infinispan.commons.util.InfinispanCollections;
-import org.infinispan.configuration.cache.CacheLoaderConfiguration;
-import org.infinispan.container.entries.InternalCacheEntry;
-import org.infinispan.container.entries.InternalCacheValue;
-import org.infinispan.loaders.CacheLoaderException;
 import org.infinispan.loaders.offheap.configuration.OffheapCacheStoreConfiguration;
 import org.infinispan.loaders.offheap.logging.Log;
-import org.infinispan.loaders.spi.LockSupportCacheStore;
+import org.infinispan.marshall.core.MarshalledValue;
+import org.infinispan.metadata.InternalMetadata;
+import org.infinispan.persistence.CacheLoaderException;
+import org.infinispan.persistence.PersistenceUtil;
+import org.infinispan.persistence.TaskContextImpl;
+import org.infinispan.persistence.spi.AdvancedLoadWriteStore;
+import org.infinispan.persistence.spi.InitializationContext;
+import org.infinispan.persistence.spi.MarshalledEntry;
 import org.infinispan.util.logging.LogFactory;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -34,26 +34,32 @@ import org.mapdb.DBMaker;
  * @author <a href="mailto:rtsang@redhat.com">Ray Tsang</a>
  * @since 6.0
  */
-public class OffheapCacheStore extends LockSupportCacheStore<Integer> {
+@SuppressWarnings("rawtypes")
+public class OffheapCacheStore implements AdvancedLoadWriteStore {
    private static final Log log = LogFactory.getLog(OffheapCacheStore.class, Log.class);
    
    private static final String STORE_DB_NAME = "store-";
    private static final String EXPIRY_DB_NAME = "expiry-";
    
    private OffheapCacheStoreConfiguration configuration;
+   private Cache cache;
+   private InitializationContext ctx;
+   
    private DB db;
    private Map<Object, byte[]> store;
-   private Map<Long, Object> expired;
+   private Map<Long, byte[]> expired;
    private BlockingQueue<ExpiryEntry> expiryEntryQueue;
 
    @Override
-   public void init(CacheLoaderConfiguration config, Cache<?, ?> cache, StreamingMarshaller m) throws CacheLoaderException {
-      this.configuration = validateConfigurationClass(config, OffheapCacheStoreConfiguration.class);
-      super.init(config, cache, m);
+   public void init(InitializationContext ctx) {
+      this.configuration = ctx.getConfiguration();
+      this.cache = ctx.getCache();
+      this.ctx = ctx;
    }
-
+   
+   
    @Override
-   public void start() throws CacheLoaderException {
+   public void start() {
       expiryEntryQueue = new LinkedBlockingQueue<ExpiryEntry>(configuration.expiryQueueSize());
       DBMaker<?> dbMaker = DBMaker.newDirectMemoryDB()
             .transactionDisable().asyncWriteDisable();
@@ -64,189 +70,182 @@ public class OffheapCacheStore extends LockSupportCacheStore<Integer> {
       
       this.db = dbMaker.make();
       
+      
       this.store = db.createHashMap(STORE_DB_NAME + cache.getName())
             .makeOrGet();
       this.expired = db.createHashMap(EXPIRY_DB_NAME + cache.getName())
             .makeOrGet();
-
-      super.start();
    }
 
    @Override
-   public void stop() throws CacheLoaderException {
+   public void stop() {
       db.close();
-      
-      super.stop();
    }
-
+   
    @Override
-   protected void clearLockSafe() throws CacheLoaderException {
+   public void clear() {
       store.clear();
    }
-
+   
    @Override
-   protected Set<InternalCacheEntry> loadAllLockSafe() throws CacheLoaderException {
-      Set<InternalCacheEntry> entries = new HashSet<InternalCacheEntry>();
-      
+   public MarshalledEntry load(Object key) {
       try {
-         for (Map.Entry<Object, byte[]> entry : store.entrySet()) {
-            entries.add(unmarshall(entry));
-         }
-      } catch (Exception e) {
-         throw new CacheLoaderException(e);
-      }
-
-      return entries;
-   }
-
-   @Override
-   protected Set<InternalCacheEntry> loadLockSafe(int maxEntries) throws CacheLoaderException {
-      if (maxEntries <= 0)
-         return InfinispanCollections.emptySet();
-      
-      Set<InternalCacheEntry> entries = new HashSet<InternalCacheEntry>();
-      
-      try {
-         for (Map.Entry<Object, byte[]> entry : store.entrySet()) {
-            entries.add(unmarshall(entry));
-            if (entries.size() == maxEntries)
-               return entries;
-         }
-      } catch (Exception e) {
-         throw new CacheLoaderException(e);
-      }
-
-      return entries;
-   }
-
-   @Override
-   protected Set<Object> loadAllKeysLockSafe(Set<Object> keysToExclude) throws CacheLoaderException {
-      if (!cache.getStatus().allowInvocations())
-         return InfinispanCollections.emptySet();
-
-      Set<Object> keys = new HashSet<Object>();
-      
-      try {
-         for (Object key : store.keySet()) {
-            if (keysToExclude == null || keysToExclude.isEmpty() || !keysToExclude.contains(key))
-               keys.add(key);
-         }
-
-         return keys;
-      } catch (Exception e) {
-         throw new CacheLoaderException(e);
-      }
-   }
-
-   @Override
-   protected void toStreamLockSafe(ObjectOutput oos) throws CacheLoaderException {
-      try {
-         for (Map.Entry<Object, byte[]> entry : store.entrySet()) {
-            InternalCacheEntry ice = unmarshall(entry);
-            getMarshaller().objectToObjectStream(ice, oos);
-         }
-         getMarshaller().objectToObjectStream(null, oos);
-      } catch (Exception e) {
-         throw new CacheLoaderException(e);
-      }
-   }
-
-   @Override
-   protected void fromStreamLockSafe(ObjectInput ois) throws CacheLoaderException {
-      try {
-         while (true) {
-            InternalCacheEntry ice = (InternalCacheEntry) getMarshaller().objectFromObjectStream(ois);
-            if (ice == null)
-               break;
-
-            store.put(ice.getKey(), marshall(ice));
-         }
-      } catch (InterruptedException ie) {
-         Thread.currentThread().interrupt();
-      } catch (Exception e) {
-         throw new CacheLoaderException(e);
-      }
-
-   }
-
-   @Override
-   protected boolean removeLockSafe(Object key, Integer lockingKey) throws CacheLoaderException {
-      return store.remove(key) != null;
-   }
-
-   @Override
-   protected void storeLockSafe(InternalCacheEntry ed, Integer lockingKey) throws CacheLoaderException {
-      try {
-         store.put(ed.getKey(), marshall(ed));
-      } catch (Exception e) {
-         throw new CacheLoaderException(e);
-      }
-      if (ed.canExpire()) {
-         addNewExpiry(ed);
-      }
-   }
-
-   @Override
-   protected InternalCacheEntry loadLockSafe(Object key, Integer lockingKey) throws CacheLoaderException {
-      try {
-         InternalCacheValue icv = (InternalCacheValue) unmarshall(store.get(key));
-         if (icv == null)
+         MarshalledEntry me = (MarshalledEntry) unmarshall(store.get(key));
+         if (me == null) return null;
+   
+         InternalMetadata meta = me.getMetadata();
+         if (meta != null && meta.isExpired(ctx.getTimeService().wallClockTime())) {
             return null;
+         }
+         return me;
+      } catch (Exception e) {
+         throw new CacheLoaderException(e);
+      }
+   }
+   
+   @Override
+   public boolean contains(Object key) {
+      try {
+         return load(key) != null;
+      } catch (Exception e) {
+         throw new CacheLoaderException(e);
+      }
+   }
+
+   @Override
+   public void write(MarshalledEntry entry) {
+      try {
+         // Marshall entry first, otherwise, compact is meaningless...
+         byte[] value = marshall(entry);
          
-         if (icv != null && icv.isExpired(System.currentTimeMillis())) {
-            removeLockSafe(key, lockingKey);
-            return null;
+         // Make sure we are working with the same key reference
+         Object key = entry.getKey();
+         if (key instanceof MarshalledValue) {
+            // MapDB doesn't like ExpandableMarshalledValueByteStream
+            // See ISPN-3493
+            
+            // make a deep copy of the key so that it doesn't get serialized by other threads
+            key = unmarshall(marshall(key));
+            
+            // compact it to keep only the object instance and remove MarshalledValueByteStream
+            ((MarshalledValue) key).compact(false, true);
          }
-         return icv.toInternalCacheEntry(key);
+         
+         store.put(key, value);
+         InternalMetadata meta = entry.getMetadata();
+         if (meta != null && meta.expiryTime() > -1) {
+            addNewExpiry(entry);
+         }
+      } catch (InterruptedException e) {
+         Thread.currentThread().interrupt(); // Restore interruption status
+      } catch (IOException e) {
+         throw new CacheLoaderException(e);
+      } catch (ClassNotFoundException e) {
+         throw new CacheLoaderException(e);
+      }
+   }
+
+   @Override
+   public boolean delete(Object key) {
+      try {
+         return store.remove(key) != null;
       } catch (Exception e) {
          throw new CacheLoaderException(e);
       }
    }
 
    @Override
-   protected Integer getLockFromKey(Object key) throws CacheLoaderException {
-      return key.hashCode();
+   public void process(KeyFilter filter, CacheLoaderTask task, Executor executor, boolean fetchValue,
+         boolean fetchMetadata) {
+      int batchSize = 100;
+      ExecutorCompletionService ecs = new ExecutorCompletionService(executor);
+      int tasks = 0;
+      final TaskContext taskContext = new TaskContextImpl();
+
+      List<Map.Entry<Object, byte[]>> entries = new ArrayList<Map.Entry<Object, byte[]>>(batchSize);
+      
+      try {
+         for (Map.Entry<Object, byte[]> entry : store.entrySet()) {
+            entries.add(entry);
+            if (entries.size() == batchSize) {
+               final List<Map.Entry<Object, byte[]>> batch = entries;
+               entries = new ArrayList<Map.Entry<Object, byte[]>>(batchSize);
+               submitProcessTask(task, filter, ecs, taskContext, batch);
+               tasks++;
+            }
+         }
+         if (!entries.isEmpty()) {
+            submitProcessTask(task, filter,ecs, taskContext, entries);
+            tasks++;
+         }
+
+         PersistenceUtil.waitForAllTasksToComplete(ecs, tasks);
+      } catch (Exception e) {
+         throw new CacheLoaderException(e);
+      }
+   }
+   
+   @SuppressWarnings("unchecked")
+   private void submitProcessTask(final CacheLoaderTask cacheLoaderTask, final KeyFilter filter, ExecutorCompletionService ecs,
+                                  final TaskContext taskContext, final List<Map.Entry<Object, byte[]>> batch) {
+      ecs.submit(new Callable<Void>() {
+         @Override
+         public Void call() throws Exception {
+            for (Map.Entry<Object, byte[]> entry : batch) {
+               if (taskContext.isStopped())
+                  break;
+               Object key = entry.getKey();
+               if (filter == null || filter.shouldLoadKey(key))
+                  cacheLoaderTask.processEntry((MarshalledEntry) unmarshall(entry.getValue()), taskContext);
+            }
+            return null;
+         }
+      });
+   }
+
+   @Override
+   public int size() {
+      return store.size();
    }
 
    @SuppressWarnings("unchecked")
    @Override
-   protected void purgeInternal() throws CacheLoaderException {
+   public void purge(Executor executor, PurgeListener purgeListener) {
       try {
          // Drain queue and update expiry tree
          List<ExpiryEntry> entries = new ArrayList<ExpiryEntry>();
          expiryEntryQueue.drainTo(entries);
          for (ExpiryEntry entry : entries) {
-            //final byte[] expiryBytes = marshall(entry.expiry);
-            //final byte[] keyBytes = marshall(entry.key);
-            //final byte[] existingBytes = expiredDb.get(expiryBytes);
-            
-            final Object existing = expired.get(entry.expiry);
+            final byte[] keyBytes = marshall(entry.key);
+            final byte[] existingBytes = expired.get(entry.expiry);
 
-            if (existing != null) {
+            if (existingBytes != null) {
                // in the case of collision make the key a List ...
+               final Object existing = unmarshall(existingBytes);
                if (existing instanceof List) {
                   ((List<Object>) existing).add(entry.key);
-                  expired.put(entry.expiry, existing);
+                  expired.put(entry.expiry, marshall(existing));
                } else {
                   List<Object> al = new ArrayList<Object>(2);
                   al.add(existing);
                   al.add(entry.key);
-                  expired.put(entry.expiry, al);
+                  expired.put(entry.expiry, marshall(al));
                }
             } else {
-               expired.put(entry.expiry, entry.key);
+               expired.put(entry.expiry, keyBytes);
             }
          }
 
          List<Long> times = new ArrayList<Long>();
          List<Object> keys = new ArrayList<Object>();
+         
          try {
-            for (Map.Entry<Long, Object> entry : expired.entrySet()) {
-               Long time = (Long) entry.getKey();
+            for (Map.Entry<Long, byte[]> entry : expired.entrySet()) {
+               Long time = entry.getKey();
                if (time > System.currentTimeMillis())
                   break;
                times.add(time);
-               Object key = entry.getValue();
+               Object key = unmarshall(entry.getValue());
                if (key instanceof List)
                   keys.addAll((List<?>) key);
                else
@@ -260,15 +259,14 @@ public class OffheapCacheStore extends LockSupportCacheStore<Integer> {
             if (!keys.isEmpty())
                log.debugf("purge (up to) %d entries", keys.size());
             int count = 0;
-            long currentTimeMillis = System.currentTimeMillis();
+            
             for (Object key : keys) {
-               byte [] bytes = store.get(key);
-               
-               if (bytes == null)
+               byte[] b = store.get(key);
+               if (b == null)
                   continue;
-               
-               InternalCacheValue icv = (InternalCacheValue) getMarshaller().objectFromByteBuffer(bytes);
-               if (icv.isExpired(currentTimeMillis)) {
+               MarshalledEntry me = (MarshalledEntry) ctx.getMarshaller().objectFromByteBuffer(b);
+               if (me.getMetadata() != null && me.getMetadata().isExpired(ctx.getTimeService().wallClockTime())) {
+                  // somewhat inefficient to FIND then REMOVE...
                   store.remove(key);
                   count++;
                }
@@ -285,14 +283,15 @@ public class OffheapCacheStore extends LockSupportCacheStore<Integer> {
       }
    }
 
-   private void addNewExpiry(InternalCacheEntry entry) {
-      long expiry = entry.getExpiryTime();
-      if (entry.getMaxIdle() > 0) {
+   private void addNewExpiry(MarshalledEntry entry) throws IOException {
+      long expiry = entry.getMetadata().expiryTime();
+      long maxIdle = entry.getMetadata().maxIdle();
+      if (maxIdle > 0) {
          // Coding getExpiryTime() for transient entries has the risk of
          // being a moving target
          // which could lead to unexpected results, hence, InternalCacheEntry
          // calls are required
-         expiry = entry.getMaxIdle() + System.currentTimeMillis();
+         expiry = maxIdle + System.currentTimeMillis();
       }
       Long at = expiry;
       Object key = entry.getKey();
@@ -339,34 +338,15 @@ public class OffheapCacheStore extends LockSupportCacheStore<Integer> {
       }
    }
    
-   private byte[] marshall(InternalCacheEntry entry) throws IOException, InterruptedException {
-      return marshall(entry.toInternalCacheValue());
-   }
-
    private byte[] marshall(Object entry) throws IOException, InterruptedException {
-      return getMarshaller().objectToByteBuffer(entry);
+      return ctx.getMarshaller().objectToByteBuffer(entry);
    }
 
    private Object unmarshall(byte[] bytes) throws IOException, ClassNotFoundException {
       if (bytes == null)
          return null;
 
-      return getMarshaller().objectFromByteBuffer(bytes);
+      return ctx.getMarshaller().objectFromByteBuffer(bytes);
    }
 
-   private InternalCacheEntry unmarshall(Map.Entry<Object, byte[]> entry) throws IOException, ClassNotFoundException {
-      if (entry == null || entry.getValue() == null)
-         return null;
-
-      InternalCacheValue v = (InternalCacheValue) unmarshall(entry.getValue());
-      return v.toInternalCacheEntry(entry.getKey());
-   }
-
-   private InternalCacheEntry unmarshall(byte[] value, Object key) throws IOException, ClassNotFoundException {
-      if (value == null)
-         return null;
-
-      InternalCacheValue v = (InternalCacheValue) unmarshall(value);
-      return v.toInternalCacheEntry(key);
-   }
 }

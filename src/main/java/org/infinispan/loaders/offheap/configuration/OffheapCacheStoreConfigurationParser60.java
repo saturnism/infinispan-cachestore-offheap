@@ -30,7 +30,7 @@ public class OffheapCacheStoreConfigurationParser60 implements ConfigurationPars
       Element element = Element.forName(reader.getLocalName());
       switch (element) {
       case OFFHEAP_STORE: {
-         parseOffheapCacheStore(reader, builder.loaders().addLoader(OffheapCacheStoreConfigurationBuilder.class));
+         parseOffheapCacheStore(reader, builder.persistence().addStore(OffheapCacheStoreConfigurationBuilder.class));
          break;
       }
       default: {
@@ -42,8 +42,10 @@ public class OffheapCacheStoreConfigurationParser60 implements ConfigurationPars
    private void parseOffheapCacheStore(XMLExtendedStreamReader reader, OffheapCacheStoreConfigurationBuilder builder) throws XMLStreamException {
       for (int i = 0; i < reader.getAttributeCount(); i++) {
          ParseUtils.requireNoNamespaceAttribute(reader, i);
-         String value = StringPropertyReplacer.replaceProperties(reader.getAttributeValue(i));
-         Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
+         String attributeValue = reader.getAttributeValue(i);
+         String value = StringPropertyReplacer.replaceProperties(attributeValue);
+         String attrName = reader.getAttributeLocalName(i);
+         Attribute attribute = Attribute.forName(attrName);
 
          switch (attribute) {
          case EXPIRY_QUEUE_SIZE: {
@@ -54,7 +56,7 @@ public class OffheapCacheStoreConfigurationParser60 implements ConfigurationPars
             break;
          }
          default: {
-            Parser60.parseCommonStoreAttributes(reader, i, builder);
+            Parser60.parseCommonStoreAttributes(reader, builder, attrName, attributeValue, i);
          }
          }
       }

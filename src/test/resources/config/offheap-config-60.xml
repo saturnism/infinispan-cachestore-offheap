@@ -41,9 +41,9 @@
    </default>
 
    <namedCache name="testCache">
-      <loaders passivation="false" shared="true" preload="true">
+      <persistence passivation="false">
          <offheapStore compression="true" />
-      </loaders>
+      </persistence>
    </namedCache>
 
 </infinispan>

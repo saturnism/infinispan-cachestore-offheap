@@ -1,41 +1,56 @@
 package org.infinispan.loaders.offheap;
 
+import org.infinispan.commons.marshall.StreamingMarshaller;
+import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
-import org.infinispan.configuration.cache.LoadersConfigurationBuilder;
-import org.infinispan.container.entries.InternalCacheEntry;
-import org.infinispan.loaders.BaseCacheStoreTest;
-import org.infinispan.loaders.CacheLoaderException;
-import org.infinispan.loaders.offheap.OffheapCacheStore;
+import org.infinispan.configuration.cache.PersistenceConfigurationBuilder;
 import org.infinispan.loaders.offheap.configuration.OffheapCacheStoreConfiguration;
 import org.infinispan.loaders.offheap.configuration.OffheapCacheStoreConfigurationBuilder;
-import org.infinispan.loaders.spi.CacheStore;
-import org.infinispan.test.fwk.TestInternalCacheEntryFactory;
+import org.infinispan.manager.EmbeddedCacheManager;
+import org.infinispan.persistence.BaseCacheStoreTest;
+import org.infinispan.persistence.CacheLoaderException;
+import org.infinispan.persistence.DummyLoaderContext;
+import org.infinispan.persistence.spi.AdvancedLoadWriteStore;
+import org.infinispan.test.TestingUtil;
+import org.infinispan.test.fwk.TestCacheManagerFactory;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 @Test(groups = "unit", testName = "loaders.offheap.OffheapCacheStoreTest")
 public class OffheapCacheStoreTest extends BaseCacheStoreTest {
-
+   private EmbeddedCacheManager cacheManager;
    private OffheapCacheStore fcs;
-
-   protected OffheapCacheStoreConfiguration createCacheStoreConfig(LoadersConfigurationBuilder lcb) throws CacheLoaderException {
+   
+   protected OffheapCacheStoreConfiguration createCacheStoreConfig(PersistenceConfigurationBuilder lcb) {
       OffheapCacheStoreConfigurationBuilder cfg = new OffheapCacheStoreConfigurationBuilder(lcb);
-      cfg.purgeSynchronously(true); // for more accurate unit testing
       return cfg.create();
    }
 
    @Override
-   protected CacheStore createCacheStore() throws CacheLoaderException {
+   protected AdvancedLoadWriteStore createStore() throws Exception {
+      cacheManager = TestCacheManagerFactory.createCacheManager(CacheMode.LOCAL, false);
       fcs = new OffheapCacheStore();
       ConfigurationBuilder cb = new ConfigurationBuilder();
-      OffheapCacheStoreConfiguration cfg = createCacheStoreConfig(cb.loaders());
-      fcs.init(cfg, getCache(), getMarshaller());
+      OffheapCacheStoreConfiguration cfg = createCacheStoreConfig(cb.persistence());
+      fcs.init(new DummyLoaderContext(cfg, getCache(), getMarshaller()));
       fcs.start();
       return fcs;
+   }
+   
+   @Override
+   protected StreamingMarshaller getMarshaller() {
+      return cacheManager.getCache().getAdvancedCache().getComponentRegistry().getCacheMarshaller();
+   }
+
+   @AfterMethod
+   @Override
+   public void tearDown() throws CacheLoaderException {
+      super.tearDown();
+      TestingUtil.killCacheManagers(cacheManager);
    }
    
    @Override
    @Test(enabled=false, description="We can't really test this with offheap store")
    public void testStopStartDoesNotNukeValues() throws InterruptedException, CacheLoaderException {
    }
-
 }

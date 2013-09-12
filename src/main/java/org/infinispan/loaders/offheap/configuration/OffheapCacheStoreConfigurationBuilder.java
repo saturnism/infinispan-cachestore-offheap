@@ -1,21 +1,20 @@
 package org.infinispan.loaders.offheap.configuration;
 
 import org.infinispan.commons.configuration.Builder;
-import org.infinispan.commons.util.TypedProperties;
-import org.infinispan.configuration.cache.AbstractLockSupportStoreConfigurationBuilder;
-import org.infinispan.configuration.cache.LoadersConfigurationBuilder;
+import org.infinispan.configuration.cache.AbstractStoreConfigurationBuilder;
+import org.infinispan.configuration.cache.PersistenceConfigurationBuilder;
 
 /**
  * 
  * @author <a href="mailto:rtsang@redhat.com">Ray Tsang</a>
  * 
  */
-public class OffheapCacheStoreConfigurationBuilder extends AbstractLockSupportStoreConfigurationBuilder<OffheapCacheStoreConfiguration, OffheapCacheStoreConfigurationBuilder> {
+public class OffheapCacheStoreConfigurationBuilder extends AbstractStoreConfigurationBuilder<OffheapCacheStoreConfiguration, OffheapCacheStoreConfigurationBuilder> {
 
    protected boolean compression = false;
    protected int expiryQueueSize = 10000;
 
-   public OffheapCacheStoreConfigurationBuilder(LoadersConfigurationBuilder builder) {
+   public OffheapCacheStoreConfigurationBuilder(PersistenceConfigurationBuilder builder) {
       super(builder);
    }
    
@@ -37,9 +36,10 @@ public class OffheapCacheStoreConfigurationBuilder extends AbstractLockSupportSt
 
    @Override
    public OffheapCacheStoreConfiguration create() {
-      return new OffheapCacheStoreConfiguration(compression, expiryQueueSize,
-            lockAcquistionTimeout, lockConcurrencyLevel, purgeOnStartup, purgeSynchronously, purgerThreads, fetchPersistentState, ignoreModifications,
-            TypedProperties.toTypedProperties(properties), async.create(), singletonStore.create());
+      return new OffheapCacheStoreConfiguration(purgeOnStartup, fetchPersistentState, ignoreModifications, async.create(),
+            singletonStore.create(), preload, shared, properties,
+            compression, expiryQueueSize);
+            
    }
 
    @Override
@@ -47,16 +47,11 @@ public class OffheapCacheStoreConfigurationBuilder extends AbstractLockSupportSt
       compression = template.compression();
       expiryQueueSize = template.expiryQueueSize();
       
-      // LockSupportStore-specific configuration
-      lockAcquistionTimeout = template.lockAcquistionTimeout();
-      lockConcurrencyLevel = template.lockConcurrencyLevel();
-
       // AbstractStore-specific configuration
       fetchPersistentState = template.fetchPersistentState();
       ignoreModifications = template.ignoreModifications();
       properties = template.properties();
       purgeOnStartup = template.purgeOnStartup();
-      purgeSynchronously = template.purgeSynchronously();
       this.async.read(template.async());
       this.singletonStore.read(template.singletonStore());
 

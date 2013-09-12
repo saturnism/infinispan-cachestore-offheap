@@ -6,9 +6,9 @@ import static org.testng.AssertJUnit.assertTrue;
 import java.io.IOException;
 
 import org.infinispan.Cache;
-import org.infinispan.configuration.cache.CacheLoaderConfiguration;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
+import org.infinispan.configuration.cache.StoreConfiguration;
 import org.infinispan.configuration.global.GlobalConfiguration;
 import org.infinispan.configuration.global.GlobalConfigurationBuilder;
 import org.infinispan.loaders.offheap.configuration.OffheapCacheStoreConfiguration;
@@ -28,11 +28,11 @@ public class ConfigurationTest extends AbstractInfinispanTest {
    public void testConfigBuilder() {
       GlobalConfiguration globalConfig = new GlobalConfigurationBuilder().globalJmxStatistics().transport().defaultTransport().build();
 
-      Configuration cacheConfig = new ConfigurationBuilder().loaders().addLoader(OffheapCacheStoreConfigurationBuilder.class)
+      Configuration cacheConfig = new ConfigurationBuilder().persistence().addStore(OffheapCacheStoreConfigurationBuilder.class)
             .compression(true)
             .build();
 
-      CacheLoaderConfiguration cacheLoaderConfig = cacheConfig.loaders().cacheLoaders().get(0);
+      StoreConfiguration cacheLoaderConfig = cacheConfig.persistence().stores().get(0);
       assertTrue(cacheLoaderConfig instanceof OffheapCacheStoreConfiguration);
       OffheapCacheStoreConfiguration config = (OffheapCacheStoreConfiguration) cacheLoaderConfig;
       assertEquals(true, config.compression());

@@ -1,9 +1,10 @@
 package org.infinispan.loaders.offheap.configuration;
 
+import java.util.Properties;
+
 import org.infinispan.commons.configuration.BuiltBy;
 import org.infinispan.commons.configuration.ConfigurationFor;
-import org.infinispan.commons.util.TypedProperties;
-import org.infinispan.configuration.cache.AbstractLockSupportStoreConfiguration;
+import org.infinispan.configuration.cache.AbstractStoreConfiguration;
 import org.infinispan.configuration.cache.AsyncStoreConfiguration;
 import org.infinispan.configuration.cache.SingletonStoreConfiguration;
 import org.infinispan.loaders.offheap.OffheapCacheStore;
@@ -15,17 +16,13 @@ import org.infinispan.loaders.offheap.OffheapCacheStore;
  */
 @ConfigurationFor(OffheapCacheStore.class)
 @BuiltBy(OffheapCacheStoreConfigurationBuilder.class)
-public class OffheapCacheStoreConfiguration extends AbstractLockSupportStoreConfiguration {
+public class OffheapCacheStoreConfiguration extends AbstractStoreConfiguration {
    final private boolean compression;
    final private int expiryQueueSize;
-
-   protected OffheapCacheStoreConfiguration(boolean compression, int expiryQueueSize,
-         long lockAcquistionTimeout, int lockConcurrencyLevel, boolean purgeOnStartup, boolean purgeSynchronously,
-         int purgerThreads, boolean fetchPersistentState, boolean ignoreModifications, TypedProperties properties, AsyncStoreConfiguration async,
-         SingletonStoreConfiguration singletonStore) {
-      super(lockAcquistionTimeout, lockConcurrencyLevel, purgeOnStartup, purgeSynchronously, purgerThreads, fetchPersistentState, ignoreModifications, properties, async,
-            singletonStore);
-
+   
+   public OffheapCacheStoreConfiguration(boolean purgeOnStartup, boolean fetchPersistentState, boolean ignoreModifications, AsyncStoreConfiguration async, SingletonStoreConfiguration singletonStore, boolean preload, boolean shared, Properties properties,
+         boolean compression, int expiryQueueSize) {
+      super(purgeOnStartup, fetchPersistentState, ignoreModifications, async, singletonStore, preload, shared, properties);
       this.compression = compression;
       this.expiryQueueSize = expiryQueueSize;
    }
