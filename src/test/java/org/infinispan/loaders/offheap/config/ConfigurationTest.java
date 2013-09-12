@@ -11,8 +11,8 @@ import org.infinispan.configuration.cache.ConfigurationBuilder;
 import org.infinispan.configuration.cache.StoreConfiguration;
 import org.infinispan.configuration.global.GlobalConfiguration;
 import org.infinispan.configuration.global.GlobalConfigurationBuilder;
-import org.infinispan.loaders.offheap.configuration.OffheapCacheStoreConfiguration;
-import org.infinispan.loaders.offheap.configuration.OffheapCacheStoreConfigurationBuilder;
+import org.infinispan.loaders.offheap.configuration.OffheapStoreConfiguration;
+import org.infinispan.loaders.offheap.configuration.OffheapStoreConfigurationBuilder;
 import org.infinispan.manager.DefaultCacheManager;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.infinispan.test.AbstractInfinispanTest;
@@ -28,13 +28,13 @@ public class ConfigurationTest extends AbstractInfinispanTest {
    public void testConfigBuilder() {
       GlobalConfiguration globalConfig = new GlobalConfigurationBuilder().globalJmxStatistics().transport().defaultTransport().build();
 
-      Configuration cacheConfig = new ConfigurationBuilder().persistence().addStore(OffheapCacheStoreConfigurationBuilder.class)
+      Configuration cacheConfig = new ConfigurationBuilder().persistence().addStore(OffheapStoreConfigurationBuilder.class)
             .compression(true)
             .build();
 
       StoreConfiguration cacheLoaderConfig = cacheConfig.persistence().stores().get(0);
-      assertTrue(cacheLoaderConfig instanceof OffheapCacheStoreConfiguration);
-      OffheapCacheStoreConfiguration config = (OffheapCacheStoreConfiguration) cacheLoaderConfig;
+      assertTrue(cacheLoaderConfig instanceof OffheapStoreConfiguration);
+      OffheapStoreConfiguration config = (OffheapStoreConfiguration) cacheLoaderConfig;
       assertEquals(true, config.compression());
       
       EmbeddedCacheManager cacheManager = new DefaultCacheManager(globalConfig);

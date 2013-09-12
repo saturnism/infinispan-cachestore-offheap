@@ -11,7 +11,7 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.infinispan.Cache;
-import org.infinispan.loaders.offheap.configuration.OffheapCacheStoreConfiguration;
+import org.infinispan.loaders.offheap.configuration.OffheapStoreConfiguration;
 import org.infinispan.loaders.offheap.logging.Log;
 import org.infinispan.marshall.core.MarshalledValue;
 import org.infinispan.metadata.InternalMetadata;
@@ -35,13 +35,13 @@ import org.mapdb.DBMaker;
  * @since 6.0
  */
 @SuppressWarnings("rawtypes")
-public class OffheapCacheStore implements AdvancedLoadWriteStore {
-   private static final Log log = LogFactory.getLog(OffheapCacheStore.class, Log.class);
+public class OffheapStore implements AdvancedLoadWriteStore {
+   private static final Log log = LogFactory.getLog(OffheapStore.class, Log.class);
    
    private static final String STORE_DB_NAME = "store-";
    private static final String EXPIRY_DB_NAME = "expiry-";
    
-   private OffheapCacheStoreConfiguration configuration;
+   private OffheapStoreConfiguration configuration;
    private Cache cache;
    private InitializationContext ctx;
    

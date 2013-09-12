@@ -4,8 +4,8 @@ import org.infinispan.commons.marshall.StreamingMarshaller;
 import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
 import org.infinispan.configuration.cache.PersistenceConfigurationBuilder;
-import org.infinispan.loaders.offheap.configuration.OffheapCacheStoreConfiguration;
-import org.infinispan.loaders.offheap.configuration.OffheapCacheStoreConfigurationBuilder;
+import org.infinispan.loaders.offheap.configuration.OffheapStoreConfiguration;
+import org.infinispan.loaders.offheap.configuration.OffheapStoreConfigurationBuilder;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.infinispan.persistence.BaseCacheStoreTest;
 import org.infinispan.persistence.CacheLoaderException;
@@ -19,19 +19,19 @@ import org.testng.annotations.Test;
 @Test(groups = "unit", testName = "loaders.offheap.OffheapCacheStoreTest")
 public class OffheapCacheStoreTest extends BaseCacheStoreTest {
    private EmbeddedCacheManager cacheManager;
-   private OffheapCacheStore fcs;
+   private OffheapStore fcs;
    
-   protected OffheapCacheStoreConfiguration createCacheStoreConfig(PersistenceConfigurationBuilder lcb) {
-      OffheapCacheStoreConfigurationBuilder cfg = new OffheapCacheStoreConfigurationBuilder(lcb);
+   protected OffheapStoreConfiguration createCacheStoreConfig(PersistenceConfigurationBuilder lcb) {
+      OffheapStoreConfigurationBuilder cfg = new OffheapStoreConfigurationBuilder(lcb);
       return cfg.create();
    }
 
    @Override
    protected AdvancedLoadWriteStore createStore() throws Exception {
       cacheManager = TestCacheManagerFactory.createCacheManager(CacheMode.LOCAL, false);
-      fcs = new OffheapCacheStore();
+      fcs = new OffheapStore();
       ConfigurationBuilder cb = new ConfigurationBuilder();
-      OffheapCacheStoreConfiguration cfg = createCacheStoreConfig(cb.persistence());
+      OffheapStoreConfiguration cfg = createCacheStoreConfig(cb.persistence());
       fcs.init(new DummyLoaderContext(cfg, getCache(), getMarshaller()));
       fcs.start();
       return fcs;

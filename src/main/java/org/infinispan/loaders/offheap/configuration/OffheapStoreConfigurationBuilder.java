@@ -9,21 +9,21 @@ import org.infinispan.configuration.cache.PersistenceConfigurationBuilder;
  * @author <a href="mailto:rtsang@redhat.com">Ray Tsang</a>
  * 
  */
-public class OffheapCacheStoreConfigurationBuilder extends AbstractStoreConfigurationBuilder<OffheapCacheStoreConfiguration, OffheapCacheStoreConfigurationBuilder> {
+public class OffheapStoreConfigurationBuilder extends AbstractStoreConfigurationBuilder<OffheapStoreConfiguration, OffheapStoreConfigurationBuilder> {
 
    protected boolean compression = false;
    protected int expiryQueueSize = 10000;
 
-   public OffheapCacheStoreConfigurationBuilder(PersistenceConfigurationBuilder builder) {
+   public OffheapStoreConfigurationBuilder(PersistenceConfigurationBuilder builder) {
       super(builder);
    }
    
-   public OffheapCacheStoreConfigurationBuilder expiryQueueSize(int expiryQueueSize) {
+   public OffheapStoreConfigurationBuilder expiryQueueSize(int expiryQueueSize) {
       this.expiryQueueSize = expiryQueueSize;
       return self();
    }
    
-   public OffheapCacheStoreConfigurationBuilder compression(boolean compression) {
+   public OffheapStoreConfigurationBuilder compression(boolean compression) {
       this.compression = compression;
       return self();
    }
@@ -35,15 +35,15 @@ public class OffheapCacheStoreConfigurationBuilder extends AbstractStoreConfigur
    }
 
    @Override
-   public OffheapCacheStoreConfiguration create() {
-      return new OffheapCacheStoreConfiguration(purgeOnStartup, fetchPersistentState, ignoreModifications, async.create(),
+   public OffheapStoreConfiguration create() {
+      return new OffheapStoreConfiguration(purgeOnStartup, fetchPersistentState, ignoreModifications, async.create(),
             singletonStore.create(), preload, shared, properties,
             compression, expiryQueueSize);
             
    }
 
    @Override
-   public Builder<?> read(OffheapCacheStoreConfiguration template) {
+   public Builder<?> read(OffheapStoreConfiguration template) {
       compression = template.compression();
       expiryQueueSize = template.expiryQueueSize();
       
@@ -59,7 +59,7 @@ public class OffheapCacheStoreConfigurationBuilder extends AbstractStoreConfigur
    }
 
    @Override
-   public OffheapCacheStoreConfigurationBuilder self() {
+   public OffheapStoreConfigurationBuilder self() {
       return this;
    }
 

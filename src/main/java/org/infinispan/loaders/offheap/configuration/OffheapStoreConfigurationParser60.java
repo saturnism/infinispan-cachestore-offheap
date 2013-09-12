@@ -19,9 +19,9 @@ import org.infinispan.configuration.parsing.XMLExtendedStreamReader;
  * 
  */
 @Namespaces({ @Namespace(uri = "urn:infinispan:config:offheapStore:6.0", root = "offheapStore"), @Namespace(root = "offheapStore") })
-public class OffheapCacheStoreConfigurationParser60 implements ConfigurationParser {
+public class OffheapStoreConfigurationParser60 implements ConfigurationParser {
 
-   public OffheapCacheStoreConfigurationParser60() {
+   public OffheapStoreConfigurationParser60() {
    }
 
    @Override
@@ -30,7 +30,7 @@ public class OffheapCacheStoreConfigurationParser60 implements ConfigurationPars
       Element element = Element.forName(reader.getLocalName());
       switch (element) {
       case OFFHEAP_STORE: {
-         parseOffheapCacheStore(reader, builder.persistence().addStore(OffheapCacheStoreConfigurationBuilder.class));
+         parseOffheapCacheStore(reader, builder.persistence().addStore(OffheapStoreConfigurationBuilder.class));
          break;
       }
       default: {
@@ -39,7 +39,7 @@ public class OffheapCacheStoreConfigurationParser60 implements ConfigurationPars
       }
    }
 
-   private void parseOffheapCacheStore(XMLExtendedStreamReader reader, OffheapCacheStoreConfigurationBuilder builder) throws XMLStreamException {
+   private void parseOffheapCacheStore(XMLExtendedStreamReader reader, OffheapStoreConfigurationBuilder builder) throws XMLStreamException {
       for (int i = 0; i < reader.getAttributeCount(); i++) {
          ParseUtils.requireNoNamespaceAttribute(reader, i);
          String attributeValue = reader.getAttributeValue(i);
