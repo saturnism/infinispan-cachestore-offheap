@@ -7,20 +7,19 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.infinispan.Cache;
+import org.infinispan.executors.ExecutorAllCompletionService;
 import org.infinispan.loaders.offheap.configuration.OffheapStoreConfiguration;
 import org.infinispan.loaders.offheap.logging.Log;
+import org.infinispan.marshall.core.MarshalledEntry;
 import org.infinispan.marshall.core.MarshalledValue;
 import org.infinispan.metadata.InternalMetadata;
-import org.infinispan.persistence.CacheLoaderException;
-import org.infinispan.persistence.PersistenceUtil;
 import org.infinispan.persistence.TaskContextImpl;
 import org.infinispan.persistence.spi.AdvancedLoadWriteStore;
 import org.infinispan.persistence.spi.InitializationContext;
-import org.infinispan.persistence.spi.MarshalledEntry;
+import org.infinispan.persistence.spi.PersistenceException;
 import org.infinispan.util.logging.LogFactory;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -99,7 +98,7 @@ public class OffheapStore implements AdvancedLoadWriteStore {
          }
          return me;
       } catch (Exception e) {
-         throw new CacheLoaderException(e);
+         throw new PersistenceException(e);
       }
    }
    
@@ -108,7 +107,7 @@ public class OffheapStore implements AdvancedLoadWriteStore {
       try {
          return load(key) != null;
       } catch (Exception e) {
-         throw new CacheLoaderException(e);
+         throw new PersistenceException(e);
       }
    }
 
@@ -128,7 +127,7 @@ public class OffheapStore implements AdvancedLoadWriteStore {
             key = unmarshall(marshall(key));
             
             // compact it to keep only the object instance and remove MarshalledValueByteStream
-            ((MarshalledValue) key).compact(false, true);
+//            ((MarshalledValue) key).compact(false, true);
          }
          
          store.put(key, value);
@@ -139,9 +138,9 @@ public class OffheapStore implements AdvancedLoadWriteStore {
       } catch (InterruptedException e) {
          Thread.currentThread().interrupt(); // Restore interruption status
       } catch (IOException e) {
-         throw new CacheLoaderException(e);
+         throw new PersistenceException(e);
       } catch (ClassNotFoundException e) {
-         throw new CacheLoaderException(e);
+         throw new PersistenceException(e);
       }
    }
 
@@ -150,7 +149,7 @@ public class OffheapStore implements AdvancedLoadWriteStore {
       try {
          return store.remove(key) != null;
       } catch (Exception e) {
-         throw new CacheLoaderException(e);
+         throw new PersistenceException(e);
       }
    }
 
@@ -158,8 +157,7 @@ public class OffheapStore implements AdvancedLoadWriteStore {
    public void process(KeyFilter filter, CacheLoaderTask task, Executor executor, boolean fetchValue,
          boolean fetchMetadata) {
       int batchSize = 100;
-      ExecutorCompletionService ecs = new ExecutorCompletionService(executor);
-      int tasks = 0;
+      ExecutorAllCompletionService ecs = new ExecutorAllCompletionService(executor);
       final TaskContext taskContext = new TaskContextImpl();
 
       List<Map.Entry<Object, byte[]>> entries = new ArrayList<Map.Entry<Object, byte[]>>(batchSize);
@@ -171,22 +169,20 @@ public class OffheapStore implements AdvancedLoadWriteStore {
                final List<Map.Entry<Object, byte[]>> batch = entries;
                entries = new ArrayList<Map.Entry<Object, byte[]>>(batchSize);
                submitProcessTask(task, filter, ecs, taskContext, batch);
-               tasks++;
             }
          }
          if (!entries.isEmpty()) {
             submitProcessTask(task, filter,ecs, taskContext, entries);
-            tasks++;
          }
 
-         PersistenceUtil.waitForAllTasksToComplete(ecs, tasks);
+         ecs.waitUntilAllCompleted();
       } catch (Exception e) {
-         throw new CacheLoaderException(e);
+         throw new PersistenceException(e);
       }
    }
    
    @SuppressWarnings("unchecked")
-   private void submitProcessTask(final CacheLoaderTask cacheLoaderTask, final KeyFilter filter, ExecutorCompletionService ecs,
+   private void submitProcessTask(final CacheLoaderTask cacheLoaderTask, final KeyFilter filter, ExecutorAllCompletionService ecs,
                                   final TaskContext taskContext, final List<Map.Entry<Object, byte[]>> batch) {
       ecs.submit(new Callable<Void>() {
          @Override
@@ -274,12 +270,12 @@ public class OffheapStore implements AdvancedLoadWriteStore {
             if (count != 0)
                log.debugf("purged %d entries", count);
          } catch (Exception e) {
-            throw new CacheLoaderException(e);
+            throw new PersistenceException(e);
          }
-      } catch (CacheLoaderException e) {
+      } catch (PersistenceException e) {
          throw e;
       } catch (Exception e) {
-         throw new CacheLoaderException(e);
+         throw new PersistenceException(e);
       }
    }
 
